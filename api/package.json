@@ -1,0 +1,23 @@
+{
+  "name": "todo-innit-api",
+  "version": "0.1.0",
+  "description": "API for ToDoInnit",
+  "private": true,
+  "main": "index.js",
+  "author": "Rik Roots",
+  "license": "MIT",
+  "dependencies": {
+    "arangojs": "^6.2.3",
+    "email-verify": "^0.2.1",
+    "jsonwebtoken": "^8.2.1",
+    "mailgun.js": "^2.0.1",
+    "moment": "^2.22.1",
+    "mustache": "^2.3.0",
+    "qrcode": "^1.2.0",
+    "restify": "^7.1.1",
+    "restify-cors-middleware": "*",
+    "secure-password": "^3.0.0",
+    "speakeasy": "^2.0.0",
+    "uuid": "^3.2.1"
+  }
+}

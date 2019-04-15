@@ -1,0 +1,5 @@
+.LogoutAction {
+	margin: var(--DEFAULT-BUTTON-MARGIN);
+	width: var(--DEFAULT-BUTTON-WIDTH);
+	padding: var(--DEFAULT-BUTTON-PADDING);
+}

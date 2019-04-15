@@ -1,0 +1,21 @@
+# See https://help.github.com/ignore-files/ for more about ignoring files.
+
+# excluded folders
+node_modules
+notes
+api-dist
+coverage
+build
+
+# excluded partials
+*-env.js
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# generated stuff I don't want in git repository
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

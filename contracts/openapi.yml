@@ -1,0 +1,971 @@
+# inspired by https://idratherbewriting.com/learnapidoc/pubapis_openapi_tutorial_overview
+# swagger online editor - https://editor.swagger.io/
+# to generate docs - ReDoc - https://github.com/Rebilly/ReDoc
+
+openapi: "3.0.1"
+
+info:
+  title: RikWorks boilerplate app API
+  description: 'A demonstration fullstack API skeleton - backend: Node + ArangoDB; frontend: React + Semantic UI. Note that, to save costs, I have not deployed a working API server to implement this contract. Any such API engine should (of course!) operate over https, not http.'
+  version: '0.1.0'
+  contact:
+    name: Your business name
+    url: https://your.business.website.url
+    email: hello@your.business.email.address
+
+servers:
+  - url: https://your.api.server.url/
+    description: Production server
+
+paths:
+
+  /:
+
+    get:
+      summary: 'Healthcheck endpoint'
+      tags:
+        - root
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '201':
+          $ref: '#/components/responses/MinimalOK'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /archive:
+
+    get:
+      summary: 'Download JSON archive of data held for user on system'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      responses:
+        '201':
+          $ref: '#/components/responses/ArchiveBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    post:
+      summary: 'UN-archive a user'
+      tags:
+        - administration
+      security: []
+      requestBody:
+        description: 'Similar to a login; users who have previously been archived can use this endpoint to unarchive themselves. Two Factor authentication is ignored by this login route'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: string
+                password:
+                  $ref: '#/components/schemas/Password'
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - password
+                - user
+      responses:
+        '200':
+          $ref: '#/components/responses/UserBodyTwoFAOK'
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '401':
+          $ref: '#/components/responses/LoginError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    put:
+      summary: 'Archive a user'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Set the archived flag on a user in the database; the user being archived (determined by the req.body.key attribute) does not need to be the same as the user performing the archive action (determined by the req.body.userName attribute, authenticated through req.header.User-Key and the auth token). Where the user requesting the archive is the same as the user to be archived, the calling app is required to take action to clear all relevant data from its state when it receives a 200 response. req.body.userIsSelf must be present, and must accurately represent whether the user being archived is, or is not, the user requesting the archive action.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                userName:
+                  $ref: '#/components/schemas/UserName'
+                userIsSelf:
+                  type: boolean
+              required:
+                - key
+                - userName
+                - userIsSelf
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /confirm-email:
+
+    put:
+      summary: 'Email update verification step'
+      tags:
+        - administration
+      security: []
+      requestBody:
+        description: 'Change of email address verification; users can user their userName or email address as the "user" attribute. token validity should be limited to one hour; stale tokens should be cleared from the database at regular intervals.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: string
+                token:
+                  $ref: '#/components/schemas/Token'
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - user
+                - token
+      responses:
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '409':
+          $ref: '#/components/responses/AlreadyLoggedInError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /login:
+
+    put:
+      summary: 'Login'
+      tags:
+        - onboard-login
+      security: []
+      requestBody:
+        description: 'Registered user login; users can user their userName or email address as the "user" attribute. If two factor authentication has been enabled then the response body should not include a token. Should return minimal data if user has been archived.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: string
+                password:
+                  $ref: '#/components/schemas/Password'
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - password
+                - user
+      responses:
+        '200':
+          $ref: '#/components/responses/UserBodyTwoFAOK'
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '202':
+          $ref: '#/components/responses/UserBodyArchivedOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '401':
+          $ref: '#/components/responses/LoginError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /recover:
+
+    post:
+      summary: 'New password request'
+      tags:
+        - administration
+      security: []
+      requestBody:
+        description: 'Request a one-time link for setting a new password; the "user" attribute can be either an email address (which results in 200 OK and an email with the link), or a userName which must be accompanied by a previously saved recovery "phrase" attribute (201 OK with a one-time code to use for resetting the password)'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phrase:
+                  type: string
+                user:
+                  type: string
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - user
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '201':
+          $ref: '#/components/responses/RecoveryData'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    put:
+      summary: 'Submit new password (not logged in)'
+      tags:
+        - administration
+      security: []
+      requestBody:
+        description: 'Update password; this assumes the user has lost their password and cannot login - success will return user data which effectively logs the user into the system. The user must have previously requested a one-time-token (using POST/recover end point); token validity should be limited to one hour and stale tokens should be cleared from the database at regular intervals.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  $ref: '#/components/schemas/Password'
+                token:
+                  $ref: '#/components/schemas/Token'
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - password
+                - token
+      responses:
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /register:
+
+    post:
+      summary: 'New registrant details'
+      tags:
+        - onboard-login
+      security: []
+      requestBody:
+        description: 'Main registration endpoint; If user supplies email then registration should complete with a call to the putRegister endpoint.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  $ref: '#/components/schemas/Name'
+                password:
+                  $ref: '#/components/schemas/Password'
+                recoveryPhrase:
+                  $ref: '#/components/schemas/RecoveryPhrase'
+                email:
+                  $ref: '#/components/schemas/Email'
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - name
+                - password
+                - locale
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '401':
+          $ref: '#/components/responses/LoginError'
+        '409':
+          $ref: '#/components/responses/AlreadyLoggedInError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    put:
+      summary: 'Email registration verification step'
+      tags:
+        - onboard-login
+      security: []
+      requestBody:
+        description: 'New registrant email verification; users can user their userName or email address as the "user" attribute. registerToken validity should be limited to one hour; stale tokens (and unvalidated users!) should be cleared from the database at regular intervals.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: string
+                token:
+                  $ref: '#/components/schemas/Token'
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - user
+                - token
+      responses:
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '409':
+          $ref: '#/components/responses/AlreadyLoggedInError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /token:
+
+    get:
+      summary: 'Request a new token. Stale tokens cannot be refreshed; user will need to login again'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Refresh token body'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userName:
+                  $ref: '#/components/schemas/UserName'
+              required:
+                - userName
+      responses:
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /twofa:
+
+    get:
+      summary: 'Request two factor authentication details'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Refresh token body'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userName:
+                  $ref: '#/components/schemas/UserName'
+              required:
+                - userName
+      responses:
+        '201':
+          $ref: '#/components/responses/TwoFABodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    post:
+      summary: 'Submit a two factor authentication token'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Submit a two-factor authentication token for user testing only - user must be logged in'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userName:
+                  $ref: '#/components/schemas/UserName'
+                token:
+                  $ref: '#/components/schemas/TwoFAToken'
+              required:
+                - userName
+                - token
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    put:
+      summary: 'Submit a two factor authentication token'
+      tags:
+        - administration
+      security: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Submit a two-factor authentication token to complete login - user should not be logged in'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userName:
+                  $ref: '#/components/schemas/UserName'
+                token:
+                  $ref: '#/components/schemas/TwoFAToken'
+              required:
+                - userName
+                - token
+      responses:
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '409':
+          $ref: '#/components/responses/AlreadyLoggedInError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /user:
+
+    delete:
+      summary: 'Delete user'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Delete a user from the database; the user being deleted (determined by the req.body.key attribute) does not need to be the same as the user performing the delete action (determined by the req.body.userName attribute, authenticated through req.header.User-Key and the auth token). Where the user requesting the deletion is the same as the user to be deleted, the calling app is required to take action to clear all relevant data from its state when it receives a 200 response. req.body.userIsSelf must be present, and must accurately represent whether the user being deleted is, or is not, the user requesting the deletion action.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                userName:
+                  $ref: '#/components/schemas/UserName'
+                userIsSelf:
+                  type: boolean
+              required:
+                - key
+                - userName
+                - userIsSelf
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+    put:
+      summary: 'Update user details'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Update user details - be aware that updating password and/or recoveryPhrase, and updating an email address, will require additional processing and - in the case of email updates - a second call to verify ownership of the email account.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  $ref: '#/components/schemas/Name'
+                userName:
+                  $ref: '#/components/schemas/UserName'
+                recoveryPhrase:
+                  $ref: '#/components/schemas/RecoveryPhrase'
+                email:
+                  $ref: '#/components/schemas/Email'
+                password:
+                  $ref: '#/components/schemas/Password'
+                twofaIsEnabled:
+                  type: boolean
+                locale:
+                  $ref: '#/components/schemas/Locale'
+              required:
+                - userName
+      responses:
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+  /user-auth:
+
+    put:
+      summary: 'Update user permissions'
+      tags:
+        - administration
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: header
+          name: User-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: 'Update user authorization details - endpoint restricted to changing user permissions (archiving and deleting other users); the user assigning permissions (determined by the req.body.userName attribute, authenticated through req.header.User-Key and the auth token) must be an administrator and does not need to be the same as the user being assigned permission values (determined by the req.body.key attribute). A minimum of one administrator must remain in the system at all times; a user does not need to be an administrator to be given the permissions to archive and delete other users. Must return 200 (with no data) if user successfully updates permissions for another user; 201 (with data) if updating their own permissions.'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                userName:
+                  $ref: '#/components/schemas/UserName'
+                isAdministrator:
+                  type: boolean
+                canArchiveOtherUsers:
+                  type: boolean
+                canDeleteOtherUsers:
+                  type: boolean
+              required:
+                - key
+                - userName
+      responses:
+        '200':
+          $ref: '#/components/responses/MinimalOK'
+        '201':
+          $ref: '#/components/responses/UserBodyOK'
+        '400':
+          $ref: '#/components/responses/InsufficientDataError'
+        '403':
+          $ref: '#/components/responses/AccessTokenError'
+        '500':
+          $ref: '#/components/responses/ProcessingError'
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    ArchiveBody:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          $ref: '#/components/schemas/Archive'
+
+    RecoveryBody:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          $ref: '#/components/schemas/Recovery'
+
+    ResultBody:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          type: object
+
+    TwoFABody:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          $ref: '#/components/schemas/TwoFA'
+
+    UserResultBody:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          $ref: '#/components/schemas/User'
+
+    UserResultBodyArchived:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          $ref: '#/components/schemas/UserArchived'
+
+    UserResultBodyTwoFA:
+      type: object
+      properties:
+        error: 
+          type: integer
+        message:
+          type: string
+        packet:
+          $ref: '#/components/schemas/UserTwoFA'
+
+    Archive:
+      type: string
+      format: json
+
+    Recovery:
+      type: object
+      properties:
+        token: 
+          $ref: '#/components/schemas/Token'
+      required:
+        - token
+
+    TwoFA:
+      type: object
+      properties:
+        secret: 
+          type: string
+        image: 
+          type: string
+      required:
+        - secret
+        - image
+
+    User:
+      type: object
+      properties:
+        key: 
+          type: string
+        name:
+          $ref: '#/components/schemas/Name'
+        userName:
+          $ref: '#/components/schemas/UserName'
+        email:
+          $ref: '#/components/schemas/Email'
+        locale:
+          $ref: '#/components/schemas/Locale'
+        twofaIsEnabled:
+          type: boolean
+        isArchived:
+          type: boolean
+        isAdministrator:
+          type: boolean
+        canArchiveOtherUsers:
+          type: boolean
+        canDeleteOtherUsers:
+          type: boolean
+        token:
+          $ref: '#/components/schemas/AuthorizationToken'
+        tokenExpires:
+          type: string
+          format: date-time
+      required:
+        - key
+        - name
+        - userName
+        - locale
+        - twofaIsEnabled
+        - isArchived
+        - token
+        - tokenExpires
+
+    UserArchived:
+      type: object
+      properties:
+        key: 
+          type: string
+        name:
+          $ref: '#/components/schemas/Name'
+        userName:
+          $ref: '#/components/schemas/UserName'
+        email:
+          $ref: '#/components/schemas/Email'
+        locale:
+          $ref: '#/components/schemas/Locale'
+        twofaIsEnabled:
+          type: boolean
+        isArchived:
+          type: boolean
+      required:
+        - key
+        - name
+        - userName
+        - locale
+        - twofaIsEnabled
+        - isArchived
+
+    UserTwoFA:
+      type: object
+      properties:
+        key: 
+          type: string
+        name:
+          $ref: '#/components/schemas/Name'
+        userName:
+          $ref: '#/components/schemas/UserName'
+        email:
+          $ref: '#/components/schemas/Email'
+        locale:
+          $ref: '#/components/schemas/Locale'
+        twofaIsEnabled:
+          type: boolean
+        isArchived:
+          type: boolean
+      required:
+        - key
+        - name
+        - userName
+        - locale
+        - twofaIsEnabled
+        - isArchived
+
+    AuthorizationToken:
+      type: string
+      format: jwt
+
+    Email:
+      type: string
+      pattern: '.+?@.+?\..+'
+      format: email
+
+    Locale:
+      type: string
+      enum: [en, xp]
+      default: en
+
+    Name:
+      type: string
+      minLength: 6
+
+    Password:
+      type: string
+      minLength: 6
+      format: password
+
+    RecoveryPhrase:
+      type: string
+      minLength: 12
+
+    Token:
+      type: string
+      format: uuid
+      
+    TwoFAToken:
+      type: string
+      length: 6
+      
+    UserName:
+      type: string
+      minLength: 8
+
+  parameters:
+
+    localeHeaderParam:
+      name: Accept-Language
+      in: header
+      description: 'Locale identifier can be passed either as a header value, or a query string parameter, dependent on end point preference'
+      schema: 
+        $ref: '#/components/schemas/Locale'
+      example: en
+
+    userkeyHeaderParam:
+      name: User-Key
+      in: header
+      description: 'User key value can be passed either as a header value, or a query string parameter, dependent on end point preference'
+      schema: 
+        type: string
+
+  responses:
+
+    ArchiveBodyOK:
+      description: No errors; return with JSON string of user data (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ArchiveBody'
+
+    MinimalOK:
+      description: Minimal OK (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResultBody'
+
+    RecoveryData:
+      description: No errors; return with user data (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RecoveryBody'
+
+    TwoFABodyOK:
+      description: No errors; return with two factor authentication data (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TwoFABody'
+
+    UserBodyOK:
+      description: No errors; return with user data (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserResultBody'
+
+    UserBodyArchivedOK:
+      description: No errors; return with user data (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserResultBodyArchived'
+
+    UserBodyTwoFAOK:
+      description: No errors; return with user data (code 0)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserResultBodyTwoFA'
+
+    AccessTokenError:
+      description: Access token issues (code 1004)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResultBody'
+
+    AlreadyLoggedInError:
+      description: User is attempting a login action when they are already logged in
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResultBody'
+
+    InsufficientDataError:
+      description: Supplied data has issues (json packet will include various error codes and messages)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResultBody'
+
+    LoginError:
+      description: email and password mis-match (code 1003)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResultBody'
+
+    ProcessingError:
+      description: General catch-all processing error (code 9001)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResultBody'
+
+tags:
+
+  - name: administration
+    description: "Administration covers housekeeping work such as updating user details and resetting lost passwords"
+
+  - name: onboard-login
+    description: "The registration and login endpoints are used for onboarding and verifying new users"
+
+  - name: root
+    description: "Actions on the root url"

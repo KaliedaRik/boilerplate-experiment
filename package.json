@@ -1,0 +1,35 @@
+{
+  "name": "todoinnit",
+  "version": "0.1.0",
+  "description": "Development toolchain for ToDoInnit project",
+  "main": "utilities.js",
+  "scripts": {
+
+    "clear-jest": "jest --clearCache",
+
+    "deploy-api": "node deploy-api.js",
+    "start-api": "cd api && node --experimental-modules index.js",
+    "start-api-dev": "cd api && set MYENVIRONMENT=dev&& node --experimental-modules index.js",
+    "test-api": "jest --coverage --no-cache --runInBand",
+
+    "deploy-contract": "node deploy-contract.js",
+    "test-contract": "cd contracts && http-server -p 8008",
+
+    "deploy-react-app": "cd react-app && node node_modules/react-scripts/scripts/build.js && cd ../ && node deploy-react-app.js",
+    "start-react-app": "cd react-app && node node_modules/react-scripts/scripts/start.js",
+    "test-react-app": "cd react-app && node node_modules/react-scripts/scripts/test.js --env=jsdom --coverage --no-cache --runInBand",
+
+    "test": "jest --coverage --no-cache --runInBand && cd react-app && node node_modules/react-scripts/scripts/test.js --env=jsdom --coverage --no-cache --runInBand"
+  },
+  "jest": {
+    "testPathIgnorePatterns": ["/node_modules/", "/react-app/"],
+    "verbose": true
+  },
+  "author": "Rik Roots",
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^2.1.1",
+    "aws-sdk": "^2.229.1",
+    "jest": "^22.4.3"
+  }
+}
